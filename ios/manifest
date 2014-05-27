@@ -1,0 +1,18 @@
+#
+# this is your module manifest and used by Titanium
+# during compilation, packaging, distribution, etc.
+#
+version: 0.1
+apiversion: 2
+description: My module
+author: R. van 't Westende
+license: GNU General Public License, version 2
+copyright: Total Active Media
+
+
+# these should not be edited
+name: ios
+moduleid: nl.totalactivemedia.ti.pinnedcertcheck
+guid: 68978871-bddc-4efc-ba03-41cddd8e8fb0
+platform: iphone
+minsdk: 3.2.3.GA
