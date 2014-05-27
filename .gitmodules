@@ -1,0 +1,3 @@
+[submodule "ios/assets/forge"]
+	path = ios/assets/forge
+	url = https://github.com/digitalbazaar/forge.git
