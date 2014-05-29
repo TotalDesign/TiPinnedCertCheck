@@ -1,22 +1,67 @@
 var forge = require('nl.totalactivemedia.ti.pinnedcertcheck/forge/js/forge'),
-	pinnedCerts = [];
+	_pinnedCerts = [],
+	_pinnedPubKeys = [];
 
-exports.setCertificateDir = function(dir) {
-	var dir = Titanium.Filesystem.getFile(dir);
+/**
+ * Convert binary buffer in network byte order to UTF-8 string
+ *
+ * @param {Object} buf
+ * @return {String} res
+ */
+var bufferToString = function(buf) {
+    var res = '';
+    for (var idx = 0; idx < buf.length; idx++) {
+        var b = Ti.Codec.decodeNumber({
+            source: buf,
+            position: idx,
+            type: Ti.Codec.TYPE_BYTE,
+            byteOrder: Ti.Codec.BIG_ENDIAN
+        });
+
+        if (b < 0) {
+        	b = 256 + b;
+        }
+
+        res += String.fromCharCode(b);
+    }
+    return res;
+};
+
+var _readDir = function(resourcesDir, registry) {
+	var dir = Titanium.Filesystem.getFile(resourcesDir);
 	var dirFiles = dir.getDirectoryListing();
 
-	// Read pinned certificates from certificate asset repo
+	if (dirFiles == null) return;
+
+	// Read pinned public keys from public key asset repo
 	for (var i = 0; i < dirFiles.length; i++) {
 		var file = Ti.Filesystem.getFile(resourcesDir + encodeURIComponent(dirFiles[i])).read();
 		if (file) {
-			pinnedCerts.push(file.toString().replace(/(?:\r\n|\r|\n)/g, ''));
+			registry.push(file.toString().replace(/(?:\r\n|\r|\n)/g, ''));
 		}
 	}
 };
 
-exports.check = function(host, callback) {
+exports.setPublicKeyDir = function(resourcesDir) {
+	_readDir(resourcesDir, _pinnedPubKeys);
+};
+
+exports.setCertificateDir = function(resourcesDir) {
+	_readDir(resourcesDir, _pinnedCerts);
+};
+
+exports.check = function(options) {
+	options = _.extend({
+		"host": "",
+		"callback": function() {},
+		"checks": {
+			"certificate": true,
+			"pubkey": true
+		}
+	}, options);
+
 	var socket = Ti.Network.Socket.createTCP({
-		host: host,
+		host: options.host,
 		port: 443,
 		connected: function() {
 			Ti.API.debug('[TiPinnedCertCheck] socket connected');
@@ -30,25 +75,6 @@ exports.check = function(host, callback) {
 			Ti.API.info(e.error);
 		}
 	});
-
-	var bufferToString = function(buf){
-	    var res = '';
-	    for (var idx = 0; idx < buf.length; idx++){
-	        var b = Ti.Codec.decodeNumber({
-	            source: buf,
-	            position: idx,
-	            type: Ti.Codec.TYPE_BYTE,
-	            byteOrder: Ti.Codec.BIG_ENDIAN
-	        });
-
-	        if (b < 0) {
-	        	b = 256 + b;
-	        }
-
-	        res += String.fromCharCode(b);
-	    }
-	    return res;
-	};
 
 	var pumpCallback = function(e) {
 		// Has the remote socket closed its end?
@@ -70,27 +96,59 @@ exports.check = function(host, callback) {
 	    }
 	};
 
-
 	// create TLS client
 	var client = forge.tls.createConnection({
 		server: false,
 		verify: function(connection, verified, depth, certs) {
-			if (_.contains(pinnedCerts, forge.pki.certificateToPem(certs[depth]).replace(/(?:\r\n|\r|\n)/g, ''))) {
-				Ti.API.debug(String.format('[TiPinnedCertCheck] tls Certificate verified for %s.', certs[depth].subject.getField('CN').value));
+
+			// Check certificate validity
+			var now = new Date();
+			if (now >= certs[depth].validity.notBefore && now <= certs[depth].validity.notAfter) {
+				Ti.API.debug(String.format('[TiPinnedCertCheck] tls Certificate for %s is valid.', certs[depth].subject.getField('CN').value));
 				verified = true;
 			}
 			else {
 				verified = {
 					alert: forge.tls.Alert.Description.bad_certificate,
-					message: 'Certificates do not match pinned ones.'
+					message: 'Certificates is no longer valid.'
 				};
+			}
+
+			// Check certificate
+			if (options.checks.certificate) {
+
+				if (_.contains(_pinnedCerts, forge.pki.certificateToPem(certs[depth]).replace(/(?:\r\n|\r|\n)/g, ''))) {
+					Ti.API.debug(String.format('[TiPinnedCertCheck] tls Certificate match for %s.', certs[depth].subject.getField('CN').value));
+					verified = true;
+				}
+				else {
+					verified = {
+						alert: forge.tls.Alert.Description.bad_certificate,
+						message: 'Certificates do not match pinned ones.'
+					};
+				}
+			}
+
+			// Check public key
+			if (options.checks.pubkey) {
+
+				if (_.contains(_pinnedPubKeys, forge.pki.publicKeyToPem(certs[depth].publicKey).replace(/(?:\r\n|\r|\n)/g, ''))) {
+					Ti.API.debug(String.format('[TiPinnedCertCheck] tls Public key verified for %s.', certs[depth].subject.getField('CN').value));
+					verified = true;
+				}
+				else {
+					verified = {
+						alert: forge.tls.Alert.Description.bad_certificate,
+						message: 'Certificates do not match pinned ones.'
+					};
+				}
 			}
 
 			return verified;
 		},
 		connected: function(connection) {
 			Ti.API.debug('[TiPinnedCertCheck] tls connected');
-			callback(true);
+			options.callback(true);
 		},
 		tlsDataReady: function(connection) {
 			var data = connection.tlsData.getBytes();
@@ -118,7 +176,7 @@ exports.check = function(host, callback) {
 		},
 		error: function(connection, error) {
 			Ti.API.debug('[TiPinnedCertCheck] tls error', error);
-			callback(false, error);
+			options.callback(false, error);
 		}
 	});
 
