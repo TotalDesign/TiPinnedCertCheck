@@ -1,39 +1,14 @@
-// This is a test harness for your module
-// You should do something interesting in this harness 
-// to test out the module and to provide instructions 
-// to users on how to use it by example.
+var certCheck = require('nl.totalactivemedia.ti.pinnedcertcheck');
+certCheck.setCertificateDir( Ti.Filesystem.getResourcesDirectory() + "certificates/" );
+certCheck.setPublicKeyDir( Ti.Filesystem.getResourcesDirectory() + "pubkeys/" );
 
-
-// open a single window
-var win = Ti.UI.createWindow({
-	backgroundColor:'white'
+certCheck.check({
+	"host": 'storage.googleapis.com',
+    "callback": function(success, error) {
+    	alert(success ? "Checks passed!" : "Checks failed!");
+    },
+    "checks": {
+    	"certificate": true,
+    	"pubkey": true
+    }
 });
-var label = Ti.UI.createLabel();
-win.add(label);
-win.open();
-
-// TODO: write your module tests here
-var ios = require('nl.totalactivemedia.ti.pinnedcertcheck');
-Ti.API.info("module is => " + ios);
-
-label.text = ios.example();
-
-Ti.API.info("module exampleProp is => " + ios.exampleProp);
-ios.exampleProp = "This is a test value";
-
-if (Ti.Platform.name == "android") {
-	var proxy = ios.createExample({
-		message: "Creating an example Proxy",
-		backgroundColor: "red",
-		width: 100,
-		height: 100,
-		top: 100,
-		left: 150
-	});
-
-	proxy.printMessage("Hello world!");
-	proxy.message = "Hi world!.  It's me again.";
-	proxy.printMessage("Hello world!");
-	win.add(proxy);
-}
-
