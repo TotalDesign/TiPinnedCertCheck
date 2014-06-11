@@ -110,7 +110,7 @@ exports.check = function(options) {
 			else {
 				verified = {
 					alert: forge.tls.Alert.Description.bad_certificate,
-					message: 'Certificates is no longer valid.'
+					message: 'Certificate is no longer valid.'
 				};
 			}
 
@@ -124,7 +124,7 @@ exports.check = function(options) {
 				else {
 					verified = {
 						alert: forge.tls.Alert.Description.bad_certificate,
-						message: 'Certificates do not match pinned ones.'
+						message: 'Certificate does not match pinned one.'
 					};
 				}
 			}
@@ -139,7 +139,7 @@ exports.check = function(options) {
 				else {
 					verified = {
 						alert: forge.tls.Alert.Description.bad_certificate,
-						message: 'Certificates do not match pinned ones.'
+						message: 'Certificate public key does not match pinned one.'
 					};
 				}
 			}
