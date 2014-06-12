@@ -1,5 +1,6 @@
 var forge = require('nl.totalactivemedia.ti.pinnedcertcheck/forge/js/forge'),
 	_pinnedCerts = [],
+	_pinnedAkis = [],
 	_pinnedPubKeys = [];
 
 /**
@@ -42,6 +43,16 @@ var _readDir = function(resourcesDir, registry) {
 	}
 };
 
+var _readAkis = function() {
+	_.each(_pinnedCerts, function(pem) {
+		var cert = forge.pki.certificateFromPem(pem);
+
+		if (aki = cert.getExtension("authorityKeyIdentifier")) {
+			_pinnedAkis.push( JSON.stringify(aki) );
+		}
+	});
+};
+
 exports.setPublicKeyDir = function(resourcesDir) {
 	_readDir(resourcesDir, _pinnedPubKeys);
 };
@@ -56,7 +67,8 @@ exports.check = function(options) {
 		"callback": function() {},
 		"checks": {
 			"certificate": true,
-			"pubkey": true
+			"pubkey": true,
+			"aki": false
 		}
 	}, options);
 
@@ -95,6 +107,10 @@ exports.check = function(options) {
 	        Ti.API.error('[TiPinnedCertCheck] ' + ex);
 	    }
 	};
+
+	if (options.checks.aki) {
+		_readAkis();
+	}
 
 	// create TLS client
 	var client = forge.tls.createConnection({
@@ -142,6 +158,22 @@ exports.check = function(options) {
 						message: 'Certificate public key does not match pinned one.'
 					};
 				}
+			}
+
+			// Check Authority Key Identifier
+			if (options.checks.aki) {
+
+				if (_.contains(_pinnedAkis, JSON.stringify(certs[depth].getExtension("authorityKeyIdentifier")) )) {
+					Ti.API.debug(String.format('[TiPinnedCertCheck] tls Authority Key Identifier verified for %s.', certs[depth].subject.getField('CN').value));
+					verified = true;
+				}
+				else {
+					verified = {
+						alert: forge.tls.Alert.Description.bad_certificate,
+						message: 'Certificate Authority Key Identifier key does not match pinned one.'
+					};
+				}
+
 			}
 
 			return verified;
