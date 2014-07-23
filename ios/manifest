@@ -6,7 +6,7 @@ version: 0.2.0
 apiversion: 2
 description: Check certificate validity based on a list of pinned certificates and/or public keys.
 author: R. van 't Westende
-license: GNU General Public License, version 2
+license: GNU General Public License, version 3
 copyright: Total Active Media
 
 
